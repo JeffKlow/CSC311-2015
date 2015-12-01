@@ -33,6 +33,12 @@
 // (or customers).
 #define MEAN_INTERARRIVAL_TIME 3.0
 
+// Each process has a priority indicating
+// its relative importance.  Lower values
+// are 'executed' before higher ones.
+// Within each priority, FIFO order is used.
+#define PRIORITY_LEVELS 3
+
 // Create aliases for the 3 data structures
 // that this program defines and uses.
 // Also, create aliases for pointers to these
@@ -48,6 +54,10 @@ typedef struct queue Queue, *QueuePointer;
 struct process {
   // id is a unique integer identifier for the process
   int id;
+
+  // priority indicates the relative importance of
+  // this process.  Lower priorities are processed first
+  int priority;
 
   // serviceTime is a measure of the time required
   // from the CPU for this process if the process
@@ -130,6 +140,9 @@ ProcessPointer createProcess() {
   pp->serviceTime = exponentialRandom( MEAN_SERVICE_TIME );
   pp->interarrivalTime = exponentialRandom( MEAN_INTERARRIVAL_TIME );
 
+  // For demonstration purposes, priority is randomly selected here
+  (*pp).priority = ( rand() % PRIORITY_LEVELS );
+
   // At the time of the process' creation,
   // the values of the arrivalTime, serviceStartTime,
   // and serviceCompleteTime are unknown.
@@ -140,8 +153,9 @@ ProcessPointer createProcess() {
 } // createProcess()
 
 void printProcess( ProcessPointer pp ) {
-  printf( "process #%3d: (%8.4f, %8.4f, %8.4f, %8.4f, %8.4f)\n",
+  printf( "process #%3d: (%1d, %8.4f, %8.4f, %8.4f, %8.4f, %8.4f)\n",
 	  pp->id,
+          (*pp).priority,
           pp->serviceTime,
           pp->interarrivalTime,
 	  pp->arrivalTime,
@@ -204,7 +218,6 @@ void printQueue( QueuePointer qp ) {
 // service begins, and time at which service is completed.
 void printProcessesInQueue( QueuePointer qp ) {
   NodePointer np = qp->pointerToHead;
-  printf("process   id:   serviceT   intarrT  arrivalT   servStT servComT \n");
   while( np != NULL ) {
     printProcess( np->processPointer );
     np = np->pointerToPrevNode;
@@ -246,24 +259,8 @@ void enqueue( QueuePointer qp, ProcessPointer pp ) {
   qp->pointerToTail = np;
 
   // If the queue is empty, this node is the head
-  // Also handle serviceStartTime and serviceCompleteTime differently
   if( qp->pointerToHead == NULL ) {
     qp->pointerToHead = np;
-    np->processPointer->serviceStartTime = np->processPointer->arrivalTime ;
-
-    np->processPointer->serviceCompleteTime =
-        np->processPointer->serviceStartTime + np->processPointer->serviceTime ;
-  } // if
-
-  // Assigns serviceStartTime and serviceCompleteTime for noninitializing nodes
-  else {
-    np->processPointer->serviceStartTime = fmax(
-                 np->processPointer->arrivalTime,
-                 np->pointerToNextNode->processPointer->serviceCompleteTime);
-
-    np->processPointer->serviceCompleteTime =
-                 np->processPointer->serviceStartTime
-               + np->processPointer->serviceTime;
   }
 
   // increment count of number of elements in queue
@@ -291,35 +288,94 @@ ProcessPointer dequeue( QueuePointer qp ) {
   return pp;
 } // dequeue( QueuePointer )
 
+// Converts the array of priority queues into a single queue
+// Process is destructive the priority array is empty after this
+QueuePointer collapsePriorityArray( QueuePointer arr[], int len ) {
+  QueuePointer outputQ = createQueue();
+
+  int i;
+  ProcessPointer pp;
+  for( i = 0; i < len; i++ ) {
+    while( !isQueueEmpty( arr[i] ) ) {
+      pp = dequeue( arr[i] );
+      enqueue( outputQ, pp );
+    }
+    free( arr[i] );
+  } // end for
+  return outputQ;
+}
+
+// Updates each process record with its start and end times
+// Formerly handled as part of enqueue(), it is now
+// handled after the priority sorting
+void processPrograms( QueuePointer sortedQ ) {
+  // Quit early if queue is somehow empty
+  if( (*sortedQ).length == 0 ) return;
+
+  // Else iterate over the queue and update 
+  // serviceStartTime and serviceCompleteTime
+  NodePointer currNode = (*sortedQ).pointerToHead;
+  while( currNode != NULL ) {
+
+    // If this is the head node
+    if( (*currNode).pointerToNextNode == NULL ) {
+      currNode->processPointer->serviceStartTime = 
+          currNode->processPointer->arrivalTime ;
+
+      currNode->processPointer->serviceCompleteTime =
+          currNode->processPointer->serviceStartTime 
+        + currNode->processPointer->serviceTime ;
+    } // end if(head)
+    
+    // For 'average' nodes
+    else {
+      currNode->processPointer->serviceStartTime = fmax(
+          currNode->processPointer->arrivalTime,
+          currNode->pointerToNextNode->processPointer->serviceCompleteTime);
+
+      currNode->processPointer->serviceCompleteTime =
+          currNode->processPointer->serviceStartTime
+        + currNode->processPointer->serviceTime;
+    } // end else(average)
+  currNode = (*currNode).pointerToPrevNode;
+  } // end while(!=NULL)
+}
+
 // Verify that the elements of the doubly-linked
 // list are correctly linked.
 void testQueue( int numberOfProcesses ) {
   seedRandomNumberGenerator();
 
-  QueuePointer qp = createQueue();
-
-  printf( "\n\nBegin adding elements to the queue.\n\n" );
-  printQueue( qp );
+  int i;
+  QueuePointer priorityArray[PRIORITY_LEVELS];
+  // Priority queues for each priority level
+  for( i = 0; i < PRIORITY_LEVELS; i++ ) {
+    priorityArray[i] = createQueue();
+  }
 
   double elapsedTime = 0.0;
-  int i;
   for( i = 0; i < numberOfProcesses; i++ ) {
     ProcessPointer pp = createProcess();
     elapsedTime += pp->interarrivalTime;
     pp->arrivalTime = elapsedTime;
-    enqueue( qp, pp );
-    printQueue( qp );
+    enqueue( priorityArray[ (*pp).priority ], pp );
   } // for
 
+  // for easier iteration in printing and calculation
+  QueuePointer sortedQueue = collapsePriorityArray( priorityArray, PRIORITY_LEVELS );
+  processPrograms( sortedQueue );
+
   printf( "\n" );
-  printProcessesInQueue( qp );
 
   printf( "\nBegin removing elements from the queue.\n\n" );
-  printQueue( qp );
+  printQueue( sortedQueue );
+  printf("\n");
+  printProcessesInQueue( sortedQueue );
+  printf("\n");
 
-  while( !isQueueEmpty( qp ) ) {
-    ProcessPointer pp = dequeue( qp );
-    printQueue( qp );
+  while( !isQueueEmpty( sortedQueue ) ) {
+    ProcessPointer pp = dequeue( sortedQueue );
+    printQueue( sortedQueue );
     free( pp );
   } // while
 } // testQueue( int )
