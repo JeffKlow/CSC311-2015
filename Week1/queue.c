@@ -341,6 +341,35 @@ void processPrograms( QueuePointer sortedQ ) {
   } // end while(!=NULL)
 }
 
+void waitStatistics( QueuePointer queue, double output[] ) {
+  NodePointer currNode = (*queue).pointerToHead;
+  if( currNode == NULL ) return; // Just in case
+  
+  int i, count;
+  // Collect wait time within each priority level
+  for( i = 0; i < PRIORITY_LEVELS; i++ ) {
+    count = 0;
+
+    // Collect total wait time for priority 'i' in output[i]
+    while( currNode->processPointer->priority == i ) {
+      
+      output[i] += ( currNode->processPointer->serviceStartTime 
+                   - currNode->processPointer->arrivalTime) ;
+      count++;
+
+      // Go to next node if it exists
+      currNode = (*currNode).pointerToPrevNode;
+      if ( currNode == NULL ) break;
+    }
+
+    // Convert total wait into average wait
+    if ( count != 0 ) output[i] = ( output[i] / count );
+    else              output[i] = 0;
+    
+    if ( currNode == NULL ) break;
+  } // end for
+} // end waitStatistics
+
 // Verify that the elements of the doubly-linked
 // list are correctly linked.
 void testQueue( int numberOfProcesses ) {
@@ -372,6 +401,13 @@ void testQueue( int numberOfProcesses ) {
   printf("\n");
   printProcessesInQueue( sortedQueue );
   printf("\n");
+
+  // Print some statistics
+  double averageWaits[PRIORITY_LEVELS];
+  waitStatistics( sortedQueue, averageWaits );
+  for( i = 0; i < PRIORITY_LEVELS; i++) {
+    printf( "Average wait at priority %3d:  %8.4f\n", i, averageWaits[i] );
+  }
 
   while( !isQueueEmpty( sortedQueue ) ) {
     ProcessPointer pp = dequeue( sortedQueue );
