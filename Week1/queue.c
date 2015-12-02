@@ -35,7 +35,7 @@
 
 // Each process has a priority indicating
 // its relative importance.  Lower values
-// are 'executed' before higher ones.
+// are serviced before higher ones.
 // Within each priority, FIFO order is used.
 #define PRIORITY_LEVELS 3
 
@@ -140,7 +140,7 @@ ProcessPointer createProcess() {
   pp->serviceTime = exponentialRandom( MEAN_SERVICE_TIME );
   pp->interarrivalTime = exponentialRandom( MEAN_INTERARRIVAL_TIME );
 
-  // For demonstration purposes, priority is randomly selected here
+  // For demonstration purposes, randomly select priority
   (*pp).priority = ( rand() % PRIORITY_LEVELS );
 
   // At the time of the process' creation,
@@ -164,7 +164,6 @@ void printProcess( ProcessPointer pp ) {
 } // printProcess( ProcessPointer )
 
 // Print the id numbers of the...
-//   * process that is referenced in the node
 //     that is behind the given node
 //   * process that is referenced in the given node
 //   * process that is referenced in the node
@@ -246,7 +245,7 @@ void enqueue( QueuePointer qp, ProcessPointer pp ) {
   NodePointer np = (NodePointer) malloc(sizeof(Node));
   np->processPointer = pp;
 
-  // If there exists a tail, update tail node to point to np
+  // If there exists a tail, link it to this node
   if( qp->pointerToTail != NULL ) {
     qp->pointerToTail->pointerToPrevNode = np;
   } // if
@@ -255,7 +254,7 @@ void enqueue( QueuePointer qp, ProcessPointer pp ) {
   np->pointerToNextNode = qp->pointerToTail;
   np->pointerToPrevNode = NULL;
 
-  // Update queue to recognize proper tail
+  // Update queue to recognize the new tail
   qp->pointerToTail = np;
 
   // If the queue is empty, this node is the head
@@ -289,7 +288,7 @@ ProcessPointer dequeue( QueuePointer qp ) {
 } // dequeue( QueuePointer )
 
 // Converts the array of priority queues into a single queue
-// Process is destructive the priority array is empty after this
+// Process is destructive, the priority array is empty after this
 QueuePointer collapsePriorityArray( QueuePointer arr[], int len ) {
   QueuePointer outputQ = createQueue();
 
@@ -396,24 +395,26 @@ void testQueue( int numberOfProcesses ) {
 
   printf( "\n" );
 
-  printf( "\nBegin removing elements from the queue.\n\n" );
-  printQueue( sortedQueue );
+//  printf( "\nBegin removing elements from the queue.\n\n" );
+//  printQueue( sortedQueue );
+
   printf("\n");
   printProcessesInQueue( sortedQueue );
   printf("\n");
 
-  // Print some statistics
+  // Calculate and display per-priority average wait times
   double averageWaits[PRIORITY_LEVELS];
   waitStatistics( sortedQueue, averageWaits );
   for( i = 0; i < PRIORITY_LEVELS; i++) {
     printf( "Average wait at priority %3d:  %8.4f\n", i, averageWaits[i] );
   }
 
-  while( !isQueueEmpty( sortedQueue ) ) {
-    ProcessPointer pp = dequeue( sortedQueue );
-    printQueue( sortedQueue );
-    free( pp );
-  } // while
+//  while( !isQueueEmpty( sortedQueue ) ) {
+//    ProcessPointer pp = dequeue( sortedQueue );
+//    printQueue( sortedQueue );
+//    free( pp );
+//  } // while
+
 } // testQueue( int )
 
 // Create a queue and fill it with a specified
@@ -437,7 +438,7 @@ QueuePointer buildQueue( int numberOfProcesses ) {
 
 int main( int argc, char** argv ) {
 
-  testQueue( 6 );
+  testQueue( 15 );
 
   exit(0);
 } //  main( int, char** )
