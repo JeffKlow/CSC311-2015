@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+
 // This is that start of a program to simulate the 
 // first-come/first-served scheduling of processes 
 // for uninterrupted execution in a CPU 
@@ -22,22 +23,9 @@
 // arrive faster than they can be served, the length of
 // the queue (waiting line) will grow and grow.
 
-// MEAN_SERVICE_TIME is measure of the
-// amount of time needed to execute each process
-// (or take care of each customer).
-#define MEAN_SERVICE_TIME  2.0
-
-// MEAN_INTERARRIVAL_TIME is a measure of 
-// the time that elapses between the arrival
-// in the system of successive processes
-// (or customers).
-#define MEAN_INTERARRIVAL_TIME 3.0
-
-// Each process has a priority indicating
-// its relative importance.  Lower values
-// are serviced before higher ones.
-// Within each priority, FIFO order is used.
-#define PRIORITY_LEVELS 3
+// Various program-defining constants have been moved
+// here for ease of use.  Please see import.ini for details.
+#include "SimulationConstants.ini"
 
 // Create aliases for the 3 data structures
 // that this program defines and uses.
@@ -341,33 +329,84 @@ void processPrograms( QueuePointer sortedQ ) {
 }
 
 void waitStatistics( QueuePointer queue, double output[] ) {
-  NodePointer currNode = (*queue).pointerToHead;
-  if( currNode == NULL ) return; // Just in case
-  
-  int i, count;
-  // Collect wait time within each priority level
-  for( i = 0; i < PRIORITY_LEVELS; i++ ) {
-    count = 0;
+  NodePointer currNode = (*queue).pointerToHead;  
+  int i;
+  int count[PRIORITY_LEVELS];
 
-    // Collect total wait time for priority 'i' in output[i]
-    while( currNode->processPointer->priority == i ) {
-      
-      output[i] += ( currNode->processPointer->serviceStartTime 
+  // Ensure that the arrays are clean
+  for( i = 0; i < PRIORITY_LEVELS; i++) {
+    count[i] = 0;
+    output[i] = 0.0;
+  }
+
+  // Iterate over nodes, collecting wait times
+  while( currNode != NULL ) {
+    i = currNode->processPointer->priority;
+
+    output[i] += ( currNode->processPointer->serviceStartTime 
                    - currNode->processPointer->arrivalTime) ;
-      count++;
+    count[i] += 1;
 
-      // Go to next node if it exists
-      currNode = (*currNode).pointerToPrevNode;
-      if ( currNode == NULL ) break;
-    }
+    currNode = (*currNode).pointerToPrevNode;
+  } // end while
 
-    // Convert total wait into average wait
-    if ( count != 0 ) output[i] = ( output[i] / count );
-    else              output[i] = 0;
-    
-    if ( currNode == NULL ) break;
-  } // end for
+  printf("Raw wait time data:\n");
+  printf("Total Wait | Instances of priority\n");
+  // Convert totals to averages
+  for( i = 0; i < PRIORITY_LEVELS; i++ ) {
+    printf( "%8.4f   | %3d\n", output[i], count[i] );
+    if( count[i] == 0 ) output[i] = 0.0;
+    else                output[i] = (output[i] / count[i]);
+  }
 } // end waitStatistics
+
+QueuePointer getProcessOrder( QueuePointer arr[], int len ) {
+  QueuePointer outputQ = createQueue();
+  double elapsedTime = 0.0;
+
+  int i, j;
+  ProcessPointer pp;
+  for( i = 0; i < len; i++ ) {
+    while( !isQueueEmpty( arr[i] ) ) {
+      pp = peek( arr[i] );
+
+      // Top priority not ready
+      if( (*pp).arrivalTime >= elapsedTime ) {
+        // Do a lower-priority job if possible
+        for( j = i; j < len; j++ ) {
+          // Make sure arr[j] still has elements (anti-segfault)
+          if( isQueueEmpty( arr[j] ) ) continue;
+
+          pp = peek( arr[j] );
+
+          // Lower-priority isn't ready either
+          if( (*pp).arrivalTime > elapsedTime ) continue;
+
+          // Lower-priority job IS ready
+          else {
+            pp = dequeue( arr[j] );
+            elapsedTime += (*pp).serviceTime;
+            enqueue( outputQ, pp );
+            break;
+          } 
+        }// end low-priority for
+        
+        // If NO lower-priority jobs were ready, wait
+        if( j = len-1 ) elapsedTime += WAIT_TIMER;
+      }
+
+      // Top-priority job is ready
+      else {
+        pp = dequeue( arr[i] );
+        elapsedTime += (*pp).serviceTime;
+        enqueue( outputQ, pp );
+      }
+
+    }
+    free( arr[i] );
+  } // end for
+  return outputQ;
+}
 
 // Verify that the elements of the doubly-linked
 // list are correctly linked.
@@ -389,16 +428,15 @@ void testQueue( int numberOfProcesses ) {
     enqueue( priorityArray[ (*pp).priority ], pp );
   } // for
 
-  // for easier iteration in printing and calculation
-  QueuePointer sortedQueue = collapsePriorityArray( priorityArray, PRIORITY_LEVELS );
+  // Merges processes based on 'highest ready priority at this time'
+  QueuePointer sortedQueue = getProcessOrder( priorityArray, PRIORITY_LEVELS );
+
+//  // for easier iteration in printing and calculation
+//  QueuePointer sortedQueue = collapsePriorityArray( priorityArray, PRIORITY_LEVELS );
+
+  // Scans process order and properly assigns start/complete times
   processPrograms( sortedQueue );
 
-  printf( "\n" );
-
-//  printf( "\nBegin removing elements from the queue.\n\n" );
-//  printQueue( sortedQueue );
-
-  printf("\n");
   printProcessesInQueue( sortedQueue );
   printf("\n");
 
@@ -438,8 +476,7 @@ QueuePointer buildQueue( int numberOfProcesses ) {
 
 int main( int argc, char** argv ) {
 
-  testQueue( 15 );
-
+  testQueue( PROCESS_COUNT );
   exit(0);
 } //  main( int, char** )
 
