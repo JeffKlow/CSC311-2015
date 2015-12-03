@@ -151,6 +151,17 @@ void printProcess( ProcessPointer pp ) {
           pp->serviceCompleteTime );
 } // printProcess( ProcessPointer )
 
+void printProcessAsCSV( ProcessPointer pp ) {
+  printf( "%3d, %1d, %8.4f, %8.4f, %8.4f, %8.4f, %8.4f\n",
+	  pp->id,
+          (*pp).priority,
+          pp->serviceTime,
+          pp->interarrivalTime,
+	  pp->arrivalTime,
+          pp->serviceStartTime,
+          pp->serviceCompleteTime );
+} // printProcess( ProcessPointer )
+
 // Print the id numbers of the...
 //     that is behind the given node
 //   * process that is referenced in the given node
@@ -207,6 +218,16 @@ void printProcessesInQueue( QueuePointer qp ) {
   NodePointer np = qp->pointerToHead;
   while( np != NULL ) {
     printProcess( np->processPointer );
+    np = np->pointerToPrevNode;
+  } // while
+} // printProcessInQueue( QueuePointer )
+
+// Same as the above, but will output a standard CSV instead
+void printProcessesInQueueCSV( QueuePointer qp ) {
+  NodePointer np = qp->pointerToHead;
+  printf("id, priority, serviceTime, interarrivalTime, arrivalTime, serviceStartTime, serviceCompleteTime");
+  while( np != NULL ) {
+    printProcessAsCSV( np->processPointer );
     np = np->pointerToPrevNode;
   } // while
 } // printProcessInQueue( QueuePointer )
@@ -350,14 +371,14 @@ void waitStatistics( QueuePointer queue, double output[] ) {
     currNode = (*currNode).pointerToPrevNode;
   } // end while
 
-  printf("Raw wait time data:\n");
-  printf("Total Wait | Instances of priority\n");
-  // Convert totals to averages
-  for( i = 0; i < PRIORITY_LEVELS; i++ ) {
-    printf( "%8.4f   | %3d\n", output[i], count[i] );
-    if( count[i] == 0 ) output[i] = 0.0;
-    else                output[i] = (output[i] / count[i]);
-  }
+//  printf("Raw wait time data:\n");
+//  printf("Total Wait | Instances of priority\n");
+//  // Convert totals to averages
+//  for( i = 0; i < PRIORITY_LEVELS; i++ ) {
+//    printf( "%8.4f   | %3d\n", output[i], count[i] );
+//    if( count[i] == 0 ) output[i] = 0.0;
+//    else                output[i] = (output[i] / count[i]);
+//  }
 } // end waitStatistics
 
 QueuePointer getProcessOrder( QueuePointer arr[], int len ) {
@@ -437,7 +458,7 @@ void testQueue( int numberOfProcesses ) {
   // Scans process order and properly assigns start/complete times
   processPrograms( sortedQueue );
 
-  printProcessesInQueue( sortedQueue );
+  printProcessesInQueueCSV( sortedQueue );
   printf("\n");
 
   // Calculate and display per-priority average wait times
