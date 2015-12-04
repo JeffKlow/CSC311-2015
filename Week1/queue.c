@@ -418,7 +418,7 @@ QueuePointer getProcessOrder( QueuePointer arr[], int len ) {
         }// end low-priority for
         
         // If NO lower-priority jobs were ready, wait
-        if( j = len-1 ) elapsedTime += WAIT_TIMER;
+        if( j == len-1 ) elapsedTime += WAIT_TIMER;
       }
 
       // Top-priority job is ready
